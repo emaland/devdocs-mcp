@@ -29,6 +29,8 @@ e other frameworks you may have encountered, there is no API for interacting wit
 
 Svelte State Management with $state Rune
 
+[...]
+
 ## Prerequisites
 
 You need DevDocs running locally on port 9292. There are two options:
