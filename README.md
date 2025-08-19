@@ -72,10 +72,6 @@ For a smaller, faster setup with only the documentation you need:
 
    Run `thor docs:list` in the DevDocs directory to see all available options.
 
-   ```
-
-   ```
-
 3. **Build the custom image:**
 
    ```bash
@@ -103,7 +99,7 @@ This approach creates a much smaller image with only the documentation sets you 
 2. **Set up the project:**
 
    ```bash
-   cd mcp
+   cd devdocs-mcp
    uv sync
    ```
 
