@@ -1,0 +1,18 @@
+# Docker Compose for DevDocs Server
+# This runs the DevDocs documentation server that the MCP server connects to.
+# The MCP server itself runs as a subprocess of Claude, not in Docker.
+
+version: '3.8'
+
+services:
+  devdocs:
+    # Default to the full pre-built image, but can be overridden with custom builds
+    # To use a custom build: 
+    # 1. Run: devdocs-mcp-build svelte tailwindcss
+    # 2. The script will update this file automatically, or
+    # 3. Manually change to: image: devdocs:custom
+    image: ghcr.io/freecodecamp/devdocs:latest
+    ports:
+      - "9292:9292"
+    container_name: devdocs
+    restart: unless-stopped
