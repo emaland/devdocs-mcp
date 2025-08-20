@@ -11,44 +11,60 @@ class DevdocsMcp < Formula
   def install
     # Copy project files
     (libexec/"mcp").install Dir["*"]
-    
+ 
+    # Install docker-compose.yml to etc
+    etc.install "docker-compose.yml" => "devdocs-mcp/docker-compose.yml"
+ 
     # Install dependencies with uv
     cd libexec/"mcp" do
       system "uv", "sync"
     end
-    
+ 
     # Create wrapper scripts
     (bin/"devdocs-mcp").write <<~EOS
       #!/bin/bash
       cd "#{libexec}/mcp"
       exec uv run python devdocs_mcp_server.py "$@"
     EOS
-    
+ 
     (bin/"devdocs-mcp-cli").write <<~EOS
       #!/bin/bash
       cd "#{libexec}/mcp"
       exec uv run python scripts/cli.py "$@"
     EOS
-    
+ 
     (bin/"devdocs-mcp-start").write <<~EOS
       #!/bin/bash
-      docker run --name devdocs -d -p 9292:9292 ghcr.io/freecodecamp/devdocs:latest
+      # Use docker-compose if available, otherwise fallback to docker run
+      COMPOSE_FILE="#{etc}/devdocs-mcp/docker-compose.yml"
+      if [ -f "$COMPOSE_FILE" ]; then
+        docker-compose -f "$COMPOSE_FILE" up -d devdocs
+      else
+        docker run --name devdocs -d -p 9292:9292 ghcr.io/freecodecamp/devdocs:latest
+      fi
       echo "DevDocs started at http://localhost:9292"
     EOS
-    
+ 
     (bin/"devdocs-mcp-stop").write <<~EOS
       #!/bin/bash
-      docker stop devdocs
-      docker rm devdocs
+      # Use docker-compose if available, otherwise fallback to docker stop
+      COMPOSE_FILE="#{etc}/devdocs-mcp/docker-compose.yml"
+      if [ -f "$COMPOSE_FILE" ]; then
+        docker-compose -f "$COMPOSE_FILE" stop devdocs
+        docker-compose -f "$COMPOSE_FILE" rm -f devdocs
+      else
+        docker stop devdocs
+        docker rm devdocs
+      fi
       echo "DevDocs stopped"
     EOS
-    
+ 
     (bin/"devdocs-mcp-build").write <<~EOS
       #!/bin/bash
       cd "#{libexec}/mcp"
       exec bash scripts/build-devdocs.sh "$@"
     EOS
-    
+ 
     chmod 0755, bin/"devdocs-mcp"
     chmod 0755, bin/"devdocs-mcp-cli"
     chmod 0755, bin/"devdocs-mcp-start"
@@ -59,7 +75,7 @@ class DevdocsMcp < Formula
   def post_install
     ohai "Setting up DevDocs MCP Server..."
     ohai "To configure Claude, run:"
-    puts "  claude mcp add devdocs #{bin}/devdocs-mcp"
+    puts "  claude mcp add --env DEVDOCS_URL=http://localhost:9292 devdocs #{bin}/devdocs-mcp"
   end
 
   def caveats
@@ -71,7 +87,7 @@ class DevdocsMcp < Formula
          devdocs-mcp-start
 
       2. Add to Claude:
-         claude mcp add devdocs /usr/local/bin/devdocs-mcp
+         claude mcp add --env DEVDOCS_URL=http://localhost:9292 devdocs /usr/local/bin/devdocs-mcp
 
       3. Test the connection (optional):
          devdocs-mcp-cli list

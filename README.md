@@ -2,6 +2,22 @@
 
 A Model Context Protocol (MCP) stdio process that enables AI assistants like Claude to access your local DevDocs instance via HTTP, providing seamless search and retrieval of technical documentation for hundreds of programming languages, frameworks, and tools.
 
+## Quick Start
+
+```bash
+# Install via Homebrew
+brew tap emaland/devdocs-mcp
+brew install devdocs-mcp
+
+# Start DevDocs
+devdocs-mcp-start
+
+# Configure Claude
+claude mcp add --env DEVDOCS_URL=http://localhost:9292 devdocs /usr/local/bin/devdocs-mcp
+
+# Restart Claude and start using!
+```
+
 **Architecture**: This is not an HTTP server - it's a stdio-based process that communicates with Claude using the MCP protocol. The MCP server connects to a separately running DevDocs instance (typically on http://localhost:9292) to fetch documentation.
 
 ## Example use (Claude)
@@ -11,10 +27,10 @@ A Model Context Protocol (MCP) stdio process that enables AI assistants like Cla
 ⏺ I'll search the Svelte documentation for information about state management and describe what it says.
 
 ⏺ devdocs - search_docs (MCP)(slug: "svelte", query: "state management")
-⎿  No matches found for 'state management' in svelte documentation
+⎿  No matches found for 'state management' in svelte documentation
 
 ⏺ devdocs - search_docs (MCP)(slug: "svelte", query: "state")
-⎿  Search results for 'state' in svelte:
+⎿  Search results for 'state' in svelte:
 
      • $state [Runes] - path: `$state`
      … +1 line (ctrl+r to expand)
@@ -33,7 +49,7 @@ Svelte State Management with $state Rune
 
 ## Prerequisites
 
-You need DevDocs running locally on port 9292. There are two options:
+You need DevDocs running locally on port 9292. There are three options:
 
 ### Option 1: Quick Start with Pre-built Image (Multi-GB Download)
 
@@ -43,7 +59,26 @@ docker run --name devdocs -d -p 9292:9292 ghcr.io/freecodecamp/devdocs:latest
 
 **Note:** This pulls the official DevDocs image which includes ALL documentation sets (multiple gigabytes).
 
-### Option 2: Build Minimal DevDocs with Selected Docs Only
+### Option 2: Build Custom Image with Selected Docs (via Homebrew)
+
+If you installed via Homebrew, you can build a custom DevDocs image with only the docs you need:
+
+```bash
+# List available documentation sets
+devdocs-mcp-build --list
+
+# Build with specific docs only
+devdocs-mcp-build svelte tailwindcss react
+
+# Or use preset collections
+devdocs-mcp-build --minimal     # Just essential docs
+devdocs-mcp-build --popular     # Common documentation
+devdocs-mcp-build --frontend    # Frontend-focused
+```
+
+This approach creates a much smaller image with only the documentation sets you need.
+
+### Option 3: Build Minimal DevDocs Manually
 
 For a smaller, faster setup with only the documentation you need:
 
@@ -84,11 +119,26 @@ For a smaller, faster setup with only the documentation you need:
    docker run --name devdocs -d -p 9292:9292 devdocs:latest
    ```
 
-This approach creates a much smaller image with only the documentation sets you need.
+## Installation
 
-## Setup
+### Using Homebrew (Recommended)
 
-### Using Claude Code
+```bash
+# Install the MCP server
+brew tap emaland/devdocs-mcp
+brew install devdocs-mcp
+
+# Start DevDocs
+devdocs-mcp-start
+
+# Configure Claude
+claude mcp add --env DEVDOCS_URL=http://localhost:9292 devdocs /usr/local/bin/devdocs-mcp
+
+# Test the connection (optional)
+devdocs-mcp-cli list
+```
+
+### From Source
 
 1. **Install uv:**
 
@@ -96,9 +146,10 @@ This approach creates a much smaller image with only the documentation sets you 
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-2. **Set up the project:**
+2. **Clone and set up the project:**
 
    ```bash
+   git clone https://github.com/emaland/devdocs-mcp.git
    cd devdocs-mcp
    uv sync
    ```
@@ -107,12 +158,20 @@ This approach creates a much smaller image with only the documentation sets you 
 
 4. **Add MCP server to Claude:**
    ```bash
-   # If running from source:
-   claude mcp add devdocs /path/to/mcp/devdocs_mcp_server.py
-   
-   # If installed via Homebrew:
-   claude mcp add devdocs /usr/local/bin/devdocs-mcp
+   claude mcp add --env DEVDOCS_URL=http://localhost:9292 devdocs /path/to/devdocs-mcp/devdocs_mcp_server.py
    ```
+
+## Available Commands (Homebrew Installation)
+
+After installing via Homebrew, you get these commands:
+
+| Command | Purpose |
+|---------|---------|
+| `devdocs-mcp` | MCP server (called automatically by Claude) |
+| `devdocs-mcp-cli` | CLI tool to test and explore DevDocs |
+| `devdocs-mcp-start` | Start DevDocs Docker container |
+| `devdocs-mcp-stop` | Stop DevDocs Docker container |
+| `devdocs-mcp-build` | Build custom DevDocs with selected docs |
 
 ### Using Docker Compose
 
@@ -129,12 +188,12 @@ docker-compose up -d
 A command-line interface is provided for testing and exploring the MCP endpoints:
 
 ```bash
-# Using the wrapper script (after running uv sync)
-./devdocs list
-./devdocs search svelte component
-./devdocs interactive
+# If installed via Homebrew
+devdocs-mcp-cli list
+devdocs-mcp-cli search svelte component
+devdocs-mcp-cli interactive
 
-# Or using uv directly
+# Or if running from source
 uv run python scripts/cli.py list
 
 # Search in a specific documentation set
@@ -256,10 +315,10 @@ get_doc_content(slug="svelte", path="introduction", format="text")
    Using Claude CLI (recommended):
    ```bash
    # If running from source:
-   claude mcp add devdocs /path/to/mcp/devdocs_mcp_server.py
+   claude mcp add --env DEVDOCS_URL=http://localhost:9292 devdocs /path/to/mcp/devdocs_mcp_server.py
    
    # If installed via Homebrew:
-   claude mcp add devdocs /usr/local/bin/devdocs-mcp
+   claude mcp add --env DEVDOCS_URL=http://localhost:9292 devdocs /usr/local/bin/devdocs-mcp
    ```
 
    Or manually edit Claude's config file:
@@ -285,7 +344,6 @@ get_doc_content(slug="svelte", path="introduction", format="text")
 3. **Restart Claude Desktop** to load the MCP server.
 
 See [CLAUDE_SETUP.md](./CLAUDE_SETUP.md) for detailed setup instructions and troubleshooting.
-
 
 ## Environment Variables
 

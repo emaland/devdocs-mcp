@@ -245,16 +245,45 @@ if [ $? -eq 0 ]; then
     read -p "Would you like to update docker-compose.yml to use this image? (y/n) " -n 1 -r
     echo ""
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        # Find docker-compose.yml
+        # Find docker-compose.yml - try multiple locations
+        # Get the absolute path to the script directory
+        if [[ -n "${BASH_SOURCE[0]}" ]]; then
+            SCRIPT_PATH="${BASH_SOURCE[0]}"
+        else
+            SCRIPT_PATH="$0"
+        fi
+        
+        # Get absolute directory path, handling both ./scripts/foo and /full/path cases
+        if [[ "$SCRIPT_PATH" = /* ]]; then
+            # Absolute path
+            SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+        else
+            # Relative path - resolve from current directory
+            SCRIPT_DIR="$(cd "$(pwd)/$(dirname "$SCRIPT_PATH")" 2>/dev/null && pwd)"
+        fi
+        
+        # Get project directory (parent of scripts)
+        if [[ -n "$SCRIPT_DIR" ]]; then
+            PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+        else
+            PROJECT_DIR="$(pwd)"
+        fi
+        
+        # Try multiple locations for docker-compose.yml
         COMPOSE_PATHS=(
+            "$PROJECT_DIR/docker-compose.yml"
+            "./docker-compose.yml"
+            "$(pwd)/docker-compose.yml"
             "/usr/local/etc/devdocs-mcp/docker-compose.yml"
-            "$(dirname "$(dirname "$(realpath "$0")")")/docker-compose.yml"
+            "$HOME/.devdocs-mcp/docker-compose.yml"
+            "/usr/local/Cellar/devdocs-mcp/*/libexec/mcp/docker-compose.yml"
         )
         
         COMPOSE_FILE=""
         for path in "${COMPOSE_PATHS[@]}"; do
             if [ -f "$path" ]; then
                 COMPOSE_FILE="$path"
+                echo -e "${BLUE}Found docker-compose.yml at: $path${NC}"
                 break
             fi
         done
@@ -262,18 +291,29 @@ if [ $? -eq 0 ]; then
         if [ -n "$COMPOSE_FILE" ]; then
             # Backup original
             cp "$COMPOSE_FILE" "$COMPOSE_FILE.backup"
+            echo -e "${BLUE}Created backup: $COMPOSE_FILE.backup${NC}"
             
-            # Update image name
+            # Update image name for the devdocs service specifically
+            # This is more precise than replacing all image: lines
             if [[ "$OSTYPE" == "darwin"* ]]; then
-                sed -i '' "s|image:.*|image: $IMAGE_NAME|" "$COMPOSE_FILE"
+                # macOS sed - update the devdocs service image
+                sed -i '' "/^  devdocs:/,/^  [^ ]/ s|image:.*|image: $IMAGE_NAME|" "$COMPOSE_FILE"
             else
-                sed -i "s|image:.*|image: $IMAGE_NAME|" "$COMPOSE_FILE"
+                # Linux sed
+                sed -i "/^  devdocs:/,/^  [^ ]/ s|image:.*|image: $IMAGE_NAME|" "$COMPOSE_FILE"
             fi
             
-            echo -e "${GREEN}Updated $COMPOSE_FILE${NC}"
-            echo "Now you can use: devdocs-mcp-start / devdocs-mcp-stop"
+            echo -e "${GREEN}✅ Updated $COMPOSE_FILE${NC}"
+            echo -e "${GREEN}The devdocs service now uses: $IMAGE_NAME${NC}"
+            echo ""
+            echo "You can now use:"
+            echo "  devdocs-mcp-start  - Start your custom DevDocs"
+            echo "  devdocs-mcp-stop   - Stop DevDocs"
         else
-            echo -e "${YELLOW}Could not find docker-compose.yml to update${NC}"
+            echo -e "${YELLOW}⚠️  Could not find docker-compose.yml to update${NC}"
+            echo ""
+            echo "To use your custom image manually:"
+            echo "  docker run --name devdocs -d -p 9292:9292 $IMAGE_NAME"
         fi
     fi
 else

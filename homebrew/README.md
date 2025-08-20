@@ -31,7 +31,7 @@ After installation:
 
 2. Add to Claude:
    ```bash
-   claude mcp add devdocs /usr/local/bin/devdocs-mcp
+   claude mcp add --env DEVDOCS_URL=http://localhost:9292 devdocs /usr/local/bin/devdocs-mcp
    ```
 
 3. Test the connection (optional):
