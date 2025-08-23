@@ -1,6 +1,6 @@
 [project]
 name = "devdocs-mcp-server"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Model Context Protocol (MCP) server that provides seamless access to DevDocs documentation sets, enabling AI assistants to search and retrieve technical documentation for hundreds of programming languages, frameworks, and tools"
 authors = [
     {name = "Eric Maland", email = "eric@instantcocoa.com"}
