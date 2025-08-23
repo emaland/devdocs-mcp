@@ -7,6 +7,7 @@ class DevdocsMcp < Formula
 
   depends_on "python@3.12"
   depends_on "uv"
+  depends_on "pandoc"
 
   def install
     # Copy project files
@@ -64,12 +65,19 @@ class DevdocsMcp < Formula
       cd "#{libexec}/mcp"
       exec bash scripts/build-devdocs.sh "$@"
     EOS
+
+    (bin/"devdocs-mcp-build-custom").write <<~EOS
+      #!/bin/bash
+      cd "#{libexec}/mcp"
+      exec bash scripts/build-with-custom-docsets.sh "$@"
+    EOS
  
     chmod 0755, bin/"devdocs-mcp"
     chmod 0755, bin/"devdocs-mcp-cli"
     chmod 0755, bin/"devdocs-mcp-start"
     chmod 0755, bin/"devdocs-mcp-stop"
     chmod 0755, bin/"devdocs-mcp-build"
+    chmod 0755, bin/"devdocs-mcp-build-custom"
   end
 
   def post_install
@@ -94,16 +102,21 @@ class DevdocsMcp < Formula
          devdocs-mcp-cli search svelte component
 
       Commands:
-        devdocs-mcp-start  - Start the DevDocs Docker container
-        devdocs-mcp-stop   - Stop the DevDocs Docker container
-        devdocs-mcp-build  - Build custom DevDocs with selected documentation
-        devdocs-mcp-cli    - CLI tool to test and explore DevDocs
-        devdocs-mcp        - MCP server (called by Claude)
+        devdocs-mcp-start        - Start the DevDocs Docker container
+        devdocs-mcp-stop         - Stop the DevDocs Docker container
+        devdocs-mcp-build        - Build custom DevDocs with selected documentation
+        devdocs-mcp-build-custom - Build DevDocs with custom docsets (Skeleton, Tauri)
+        devdocs-mcp-cli          - CLI tool to test and explore DevDocs
+        devdocs-mcp              - MCP server (called by Claude)
       
       Build a custom DevDocs image with only the docs you need:
         devdocs-mcp-build svelte tailwindcss vite
         devdocs-mcp-build --popular
         devdocs-mcp-build --list
+
+      Build with custom docsets (Skeleton v3, Tauri v2):
+        devdocs-mcp-build-custom --with-skeleton --with-tauri svelte
+        devdocs-mcp-build-custom --frontend --with-skeleton
 
       The MCP server connects to DevDocs running at http://localhost:9292
     EOS

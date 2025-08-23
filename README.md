@@ -49,7 +49,13 @@ Svelte State Management with $state Rune
 
 ## Prerequisites
 
-You need DevDocs running locally on port 9292. There are three options:
+1. **DevDocs** running locally on port 9292 (see options below)
+2. **Pandoc** for high-quality HTML to Markdown conversion:
+   ```bash
+   brew install pandoc
+   ```
+
+### DevDocs Installation Options
 
 ### Option 1: Quick Start with Pre-built Image (Multi-GB Download)
 

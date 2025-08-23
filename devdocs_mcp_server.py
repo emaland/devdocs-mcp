@@ -94,7 +94,35 @@ class DevDocsClient:
         return response.text
     
     async def extract_text_content(self, html: str) -> str:
-        """Extract clean text content from HTML."""
+        """Extract clean text content from HTML using pandoc."""
+        try:
+            # Try to use the advanced cleaner with pandoc
+            from scripts.clean_docs import DocsCleaner
+            cleaner = DocsCleaner()
+            # Return clean Markdown for better readability
+            markdown = cleaner.clean_html(html, preserve_structure=False)
+            if markdown and markdown.strip():
+                return markdown
+        except ImportError:
+            pass
+        
+        # Fallback: Try pandoc directly
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['pandoc', '-f', 'html', '-t', 'gfm', '--wrap=none'],
+                input=html,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=5
+            )
+            if result.stdout:
+                return result.stdout
+        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        
+        # Final fallback: Basic HTML extraction
         soup = BeautifulSoup(html, 'html.parser')
         
         # Remove script and style elements
@@ -108,6 +136,79 @@ class DevDocsClient:
         text = ' '.join(chunk for chunk in chunks if chunk)
         
         return text
+    
+    async def extract_page_info(self, html: str) -> Dict[str, Any]:
+        """Extract title and section headings from HTML."""
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Extract title
+        title = None
+        # Try different title selectors in order of preference
+        title_selectors = ['h1', 'title', '.page-title', '.doc-title', '.main-title']
+        for selector in title_selectors:
+            title_elem = soup.select_one(selector)
+            if title_elem and title_elem.get_text(strip=True):
+                title = title_elem.get_text(strip=True)
+                break
+        
+        # Extract section headings (h2, h3, h4)
+        sections = []
+        for heading in soup.find_all(['h2', 'h3', 'h4', 'h5', 'h6']):
+            text = heading.get_text(strip=True)
+            if text:
+                level = int(heading.name[1])  # Extract number from h1, h2, etc.
+                heading_id = heading.get('id', '')
+                sections.append({
+                    'text': text,
+                    'level': level,
+                    'id': heading_id
+                })
+        
+        return {
+            'title': title,
+            'sections': sections
+        }
+    
+    async def list_all_docset_pages(self, slug: str, include_sections: bool = True) -> List[Dict[str, Any]]:
+        """List all pages in a docset with their titles and sections."""
+        try:
+            # Get the index to find all entries
+            index = await self.get_doc_index(slug)
+            entries = index.get("entries", [])
+            
+            pages = []
+            
+            # Process each entry to get page info
+            for entry in entries:
+                path = entry.get('path', '')
+                name = entry.get('name', '')
+                entry_type = entry.get('type', '')
+                
+                page_info = {
+                    'name': name,
+                    'path': path,
+                    'type': entry_type,
+                    'title': None,
+                    'sections': []
+                }
+                
+                if include_sections and path:
+                    try:
+                        # Get the HTML content for this page
+                        html_content = await self.get_doc_content(slug, path)
+                        page_details = await self.extract_page_info(html_content)
+                        page_info['title'] = page_details['title']
+                        page_info['sections'] = page_details['sections']
+                    except Exception as e:
+                        # If we can't get page content, continue with basic info
+                        page_info['error'] = f"Could not fetch content: {str(e)}"
+                
+                pages.append(page_info)
+            
+            return pages
+            
+        except Exception as e:
+            raise Exception(f"Failed to list pages for {slug}: {str(e)}")
     
     async def close(self):
         """Close the HTTP client."""
@@ -173,6 +274,25 @@ async def list_tools() -> List[Tool]:
                     }
                 },
                 "required": ["slug", "path"]
+            }
+        ),
+        Tool(
+            name="list_docset_pages",
+            description="List all pages, titles, and sections for a specific documentation set",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "description": "Documentation set slug (e.g., 'svelte', 'tailwindcss', 'tauri_v2')"
+                    },
+                    "include_sections": {
+                        "type": "boolean",
+                        "description": "Whether to include section headings for each page (default: true)",
+                        "default": True
+                    }
+                },
+                "required": ["slug"]
             }
         )
     ]
@@ -247,6 +367,54 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[TextConten
                 
         except Exception as e:
             return [TextContent(type="text", text=f"Error getting content for {slug}/{path}: {str(e)}")]
+    
+    elif name == "list_docset_pages":
+        slug = arguments.get("slug")
+        include_sections = arguments.get("include_sections", True)
+        
+        if not slug:
+            return [TextContent(type="text", text="Error: 'slug' parameter is required")]
+        
+        try:
+            pages = await devdocs.list_all_docset_pages(slug, include_sections)
+            
+            if not pages:
+                return [TextContent(type="text", text=f"No pages found for docset '{slug}'")]
+            
+            result = f"Pages in {slug} documentation ({len(pages)} total):\n\n"
+            
+            for page in pages:
+                name = page.get('name', 'Unknown')
+                path = page.get('path', '')
+                title = page.get('title', '')
+                page_type = page.get('type', '')
+                sections = page.get('sections', [])
+                error = page.get('error', '')
+                
+                # Format the page entry
+                type_str = f" [{page_type}]" if page_type else ""
+                title_str = f" - {title}" if title and title != name else ""
+                result += f"📄 {name}{type_str}{title_str}\n"
+                result += f"   Path: {path}\n"
+                
+                if error:
+                    result += f"   ⚠️ {error}\n"
+                elif include_sections and sections:
+                    result += f"   Sections ({len(sections)}):\n"
+                    for section in sections[:10]:  # Limit to first 10 sections
+                        level = section.get('level', 2)
+                        text = section.get('text', '')
+                        indent = "  " * (level - 1)
+                        result += f"   {indent}• {text}\n"
+                    if len(sections) > 10:
+                        result += f"   ... and {len(sections) - 10} more sections\n"
+                
+                result += "\n"
+            
+            return [TextContent(type="text", text=result)]
+            
+        except Exception as e:
+            return [TextContent(type="text", text=f"Error listing pages for {slug}: {str(e)}")]
     
     else:
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
@@ -460,6 +628,22 @@ async def startup_info():
                 "format": "Return format - 'text' (default) or 'html'"
             },
             "example": "get_doc_content(slug='python', path='library/asyncio', format='text')"
+        },
+        {
+            "name": "list_docset_pages",
+            "emoji": "📋",
+            "description": "List all pages, titles, and sections for a specific documentation set",
+            "details": [
+                "Shows comprehensive overview of all pages in a docset",
+                "Includes page titles and section headings",
+                "Provides entry names, paths, and types",
+                "Useful for exploring available documentation content"
+            ],
+            "parameters": {
+                "slug": "Documentation set identifier (e.g., 'svelte', 'tauri_v2')",
+                "include_sections": "Whether to include section headings (default: true)"
+            },
+            "example": "list_docset_pages(slug='svelte', include_sections=true)"
         }
     ]
     
@@ -504,9 +688,10 @@ async def startup_info():
         if react_doc:
             examples.append((
                 f"Find {react_doc.get('name', 'React')} Hooks documentation",
-                f"1. search_docs(slug='{react_doc.get('slug')}', query='hooks')\n"
-                f"2. search_docs(slug='{react_doc.get('slug')}', query='useState')\n"
-                f"3. get_doc_content(slug='{react_doc.get('slug')}', path='<path-from-search>')"
+                f"1. list_docset_pages(slug='{react_doc.get('slug')}') # Overview of all pages\n"
+                f"2. search_docs(slug='{react_doc.get('slug')}', query='hooks')\n"
+                f"3. search_docs(slug='{react_doc.get('slug')}', query='useState')\n"
+                f"4. get_doc_content(slug='{react_doc.get('slug')}', path='<path-from-search>')"
             ))
         
         if python_doc:
