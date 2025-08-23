@@ -2,7 +2,7 @@ class DevdocsMcp < Formula
   desc "Model Context Protocol server providing AI assistants access to DevDocs documentation"
   homepage "https://github.com/emaland/devdocs-mcp"
   url "https://github.com/emaland/devdocs-mcp/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "fee38e4ebc16df3e211aadd558966540ca98a487a1ed9c581d9da69198597d5e"
+  sha256 "2ec13ece5a502fa7c05013796788a6f4032e2cafb34cd2462f97bf802198c5c8"
   license "MIT"
 
   depends_on "python@3.12"

@@ -6,7 +6,7 @@
 set -e
 
 FORMULA_PATH="homebrew/Formula/devdocs-mcp.rb"
-VERSION="${1:-0.1.0}"
+VERSION="${1:-0.2.0}"
 
 echo "Updating SHA256 hash for DevDocs MCP v${VERSION}"
 echo "================================================"
