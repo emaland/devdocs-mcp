@@ -134,9 +134,6 @@ For a smaller, faster setup with only the documentation you need:
 brew tap emaland/devdocs-mcp
 brew install devdocs-mcp
 
-# Start DevDocs
-devdocs-mcp-start
-
 # Configure Claude
 claude mcp add --env DEVDOCS_URL=http://localhost:9292 devdocs /usr/local/bin/devdocs-mcp
 
